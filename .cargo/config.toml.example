@@ -1,0 +1,16 @@
+# APXM cargo configuration — example / template
+# Copy this file to .cargo/config.toml and fill in your local paths.
+# .cargo/config.toml is gitignored (contains machine-specific paths).
+#
+# Toolchain: x86_64-pc-windows-msvc
+# Requires:  VS 2022 + "Desktop development with C++" workload + Windows 10 SDK
+
+# [env]
+# ── MLIR/LLVM (optional — only needed to build the native compiler) ──────────
+# Point at the conda environment that has MLIR installed.
+# Example (Windows, conda-forge):
+#   conda create -n mlir-dev mlir libclang -c conda-forge
+#
+# CONDA_PREFIX  = "C:/path/to/conda/envs/mlir-dev/Library"
+# MLIR_DIR      = "C:/path/to/conda/envs/mlir-dev/Library"
+# LIBCLANG_PATH = "C:/path/to/conda/envs/mlir-dev/Library/bin"

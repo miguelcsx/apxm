@@ -49,6 +49,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg_attr(not(feature = "mlir"), ignore = "requires MLIR installation")]
     fn context_create_and_destroy() {
         let ctx = Context::new();
         assert!(ctx.is_ok());

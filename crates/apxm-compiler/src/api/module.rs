@@ -235,6 +235,7 @@ mod tests {
     use apxm_core::types::AISOperationType;
 
     #[test]
+    #[cfg_attr(not(feature = "mlir"), ignore = "requires MLIR installation")]
     fn dsl_canonicalizes_to_graph_before_mlir() {
         let context = Context::new().expect("create context");
         let source = r#"
@@ -253,6 +254,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(not(feature = "mlir"), ignore = "requires MLIR installation")]
     fn dsl_module_parse_uses_graph_lowering_path() {
         let context = Context::new().expect("create context");
         let source = r#"
@@ -270,6 +272,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(not(feature = "mlir"), ignore = "requires MLIR installation")]
     fn dsl_flow_calls_are_canonicalized_into_graph_nodes() {
         let context = Context::new().expect("create context");
         let source = r#"
@@ -298,6 +301,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(not(feature = "mlir"), ignore = "requires MLIR installation")]
     fn dsl_structured_control_if_parallel_switch_lowers_through_graph() {
         let context = Context::new().expect("create context");
         let source = r#"
@@ -355,6 +359,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(not(feature = "mlir"), ignore = "requires MLIR installation")]
     fn dsl_structured_control_loop_try_catch_lowers_through_graph() {
         let context = Context::new().expect("create context");
         let source = r#"

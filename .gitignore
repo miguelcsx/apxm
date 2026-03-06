@@ -86,3 +86,17 @@ mamba*
 
 # Build
 .apxm
+
+# Local machine-specific cargo config (contains local paths, do not commit)
+# Copy .cargo/config.toml.example to .cargo/config.toml and fill in your paths
+.cargo/config.toml
+
+# Worktrees (managed by git worktree, not part of main tree)
+.worktrees/
+
+# Environment / secrets
+.env
+.env.*
+*.key
+*.pem
+apxm.toml.local

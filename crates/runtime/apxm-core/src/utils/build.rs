@@ -31,7 +31,14 @@ impl Platform {
 
     pub fn mlir_library_patterns(&self) -> Vec<&'static str> {
         match self {
-            Self::Windows => vec!["MLIR.dll"],
+            // Prefer the monolithic DLL; conda-forge ships split static libs so also
+            // accept the always-present LLVM C-API DLL and individual MLIR import libs.
+            Self::Windows => vec![
+                "MLIR.dll",
+                "LLVM-C.dll",
+                "MLIRAffineDialect.lib",
+                "MLIRCoreMLIRInterfaces.lib",
+            ],
             Self::MacOS => vec!["libMLIR.dylib", "libMLIR.so"],
             Self::Linux => vec!["libMLIR.so"],
         }

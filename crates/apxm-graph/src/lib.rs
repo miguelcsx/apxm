@@ -1,3 +1,29 @@
+//! APXM Graph — canonical intermediate representation between AIS DSL and MLIR.
+//!
+//! `ApxmGraph` is the single exchange format that the compiler front-end
+//! produces and the runtime executor consumes.  It sits between the human-
+//! authored AIS DSL and the MLIR dialect:
+//!
+//! ```text
+//! AIS DSL  ──→  ApxmGraph (JSON)  ──→  AIS MLIR dialect  ──→  .apxmobj
+//! ```
+//!
+//! # Key types
+//!
+//! - [`ApxmGraph`] — a named directed graph of [`GraphNode`]s connected by [`GraphEdge`]s.
+//! - [`GraphNode`] — one AIS operation (op + typed attribute map).
+//! - [`GraphEdge`] — a typed dependency between two nodes ([`DependencyType`]).
+//!
+//! # Usage
+//!
+//! ```rust
+//! use apxm_graph::ApxmGraph;
+//!
+//! let json = r#"{"name":"hello","nodes":[],"edges":[],"parameters":[],"metadata":{}}"#;
+//! let graph: ApxmGraph = serde_json::from_str(json).expect("parse");
+//! assert_eq!(graph.name, "hello");
+//! ```
+
 use apxm_core::types::{AISOperationType, DependencyType, Value, execution::ExecutionDag};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

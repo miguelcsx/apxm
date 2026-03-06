@@ -298,16 +298,32 @@ fn generate_bindings(
     let bindings_path = out_dir.join("bindings.rs");
     let header_path = manifest_dir.join("mlir/include/ais/CAPI/Compiler.h");
 
-    // Set up libclang path for bindgen
-    let clang_lib_path = mlir_prefix.join("lib");
-    if clang_lib_path.exists() {
-        log_info!(
-            "apxm-compiler-build",
-            "Setting clang library path for bindgen: {}",
-            clang_lib_path.display()
-        );
-        unsafe {
-            env::set_var("LIBCLANG_PATH", &clang_lib_path);
+    // Set up libclang path for bindgen.
+    // Priority: existing LIBCLANG_PATH env var > prefix/bin (Windows conda) > prefix/lib.
+    if env::var("LIBCLANG_PATH").is_err() {
+        // On Windows, conda-forge puts libclang-*.dll in bin/, not lib/.
+        let candidates = [mlir_prefix.join("bin"), mlir_prefix.join("lib")];
+        let libclang_names = ["libclang.dll", "libclang-13.dll", "libclang-14.dll",
+                               "libclang-15.dll", "libclang-16.dll", "libclang-17.dll",
+                               "libclang-18.dll", "libclang-19.dll", "libclang-20.dll",
+                               "libclang-21.dll", "libclang-22.dll",
+                               "libclang.so", "libclang.dylib"];
+        let found = candidates.iter().find(|dir| {
+            dir.exists() && libclang_names.iter().any(|name| dir.join(name).exists())
+        });
+        if let Some(dir) = found {
+            log_info!(
+                "apxm-compiler-build",
+                "Setting LIBCLANG_PATH for bindgen: {}",
+                dir.display()
+            );
+            unsafe { env::set_var("LIBCLANG_PATH", dir); }
+        } else {
+            // Fall back to prefix/lib even if we couldn't confirm a file there
+            let clang_lib_path = mlir_prefix.join("lib");
+            if clang_lib_path.exists() {
+                unsafe { env::set_var("LIBCLANG_PATH", &clang_lib_path); }
+            }
         }
     }
 
@@ -395,6 +411,125 @@ fn emit_compiler_link_directives(install_dir: &Path, mlir_layout: &MlirLayout) -
     Ok(())
 }
 
+/// Generate stub bindings when MLIR is not available.
+///
+/// This allows the crate to compile without a full LLVM/MLIR installation.
+/// All stub functions return null/error — the Rust API layer converts them to
+/// `CompilerError::MlirNotAvailable` at runtime.
+fn generate_stub_bindings(out_dir: &Path) -> Result<()> {
+    // Signatures are derived from how the Rust API layer in api/module.rs, api/context.rs,
+    // passes/manager.rs, and passes/registry.rs call into the FFI layer.
+    let stub = r#"
+// Stub bindings generated because MLIR was not found at build time.
+// All functions return null/false/empty — the Rust wrappers surface CompilerError at runtime.
+#[allow(dead_code, non_upper_case_globals, non_camel_case_types, clippy::missing_safety_doc)]
+pub mod bindings_inner {
+    use std::os::raw::{c_char, c_uint};
+
+    // ── Opaque handle types ────────────────────────────────────────────────
+    #[repr(C)] pub struct ApxmCompilerContext { _p: [u8; 0] }
+    #[repr(C)] pub struct ApxmModule          { _p: [u8; 0] }
+    #[repr(C)] pub struct ApxmPassManager     { _p: [u8; 0] }
+    #[repr(C)] pub struct ApxmError           {
+        pub code: c_uint,
+        pub message: *const c_char,
+        pub file_path: *const c_char,
+        pub file_line: c_uint,
+        pub file_col: c_uint,
+        pub file_line_end: c_uint,
+        pub file_col_end: c_uint,
+        pub snippet: *const c_char,
+        pub label: *const c_char,
+        pub help: *const c_char,
+        pub highlight_start: c_uint,
+        pub highlight_end: c_uint,
+    }
+    #[repr(C)] pub struct ApxmPassInfo {
+        pub name: *const c_char,
+        pub description: *const c_char,
+        pub category: c_uint,
+    }
+    #[repr(C)] pub struct ApxmArtifactOptions {
+        pub module_name: *const c_char,
+        pub emit_debug_json: bool,
+        pub target_version: *const c_char,
+    }
+
+    // ── Context ────────────────────────────────────────────────────────────
+    pub unsafe fn apxm_compiler_context_create() -> *mut ApxmCompilerContext { std::ptr::null_mut() }
+    pub unsafe fn apxm_compiler_context_destroy(_ctx: *mut ApxmCompilerContext) {}
+
+    // ── Module ─────────────────────────────────────────────────────────────
+    /// Parse MLIR text into a module. Returns null on failure.
+    pub unsafe fn apxm_module_parse(
+        _ctx: *mut ApxmCompilerContext, _src: *const c_char,
+    ) -> *mut ApxmModule { std::ptr::null_mut() }
+    /// Verify module. Returns false on failure.
+    pub unsafe fn apxm_module_verify(_m: *mut ApxmModule) -> bool { false }
+    /// Serialize module to MLIR text. Caller must free with apxm_string_free.
+    pub unsafe fn apxm_module_to_string(_m: *mut ApxmModule) -> *mut c_char { std::ptr::null_mut() }
+    pub unsafe fn apxm_module_destroy(_m: *mut ApxmModule) {}
+
+    // ── DSL parsing ────────────────────────────────────────────────────────
+    pub unsafe fn apxm_parse_dsl(
+        _ctx: *mut ApxmCompilerContext, _src: *const c_char,
+    ) -> *mut ApxmModule { std::ptr::null_mut() }
+    pub unsafe fn apxm_parse_dsl_file(
+        _ctx: *mut ApxmCompilerContext, _path: *const c_char,
+    ) -> *mut ApxmModule { std::ptr::null_mut() }
+    /// Returns allocated JSON string (caller frees with apxm_string_free), or null on failure.
+    pub unsafe fn apxm_parse_dsl_to_graph_json(
+        _ctx: *mut ApxmCompilerContext, _src: *const c_char, _filename: *const c_char,
+    ) -> *mut c_char { std::ptr::null_mut() }
+    pub unsafe fn apxm_parse_dsl_file_to_graph_json(
+        _ctx: *mut ApxmCompilerContext, _path: *const c_char,
+    ) -> *mut c_char { std::ptr::null_mut() }
+
+    // ── Pass manager ───────────────────────────────────────────────────────
+    pub unsafe fn apxm_pass_manager_create(
+        _ctx: *mut ApxmCompilerContext,
+    ) -> *mut ApxmPassManager { std::ptr::null_mut() }
+    pub unsafe fn apxm_pass_manager_destroy(_pm: *mut ApxmPassManager) {}
+    pub unsafe fn apxm_pass_manager_add_pass_by_name(
+        _pm: *mut ApxmPassManager, _name: *const c_char,
+    ) -> bool { false }
+    pub unsafe fn apxm_pass_manager_clear(_pm: *mut ApxmPassManager) {}
+    pub unsafe fn apxm_pass_manager_run(
+        _pm: *mut ApxmPassManager, _m: *mut ApxmModule,
+    ) -> bool { false }
+
+    // ── Pass registry ──────────────────────────────────────────────────────
+    pub unsafe fn apxm_pass_registry_get_count() -> usize { 0 }
+    pub unsafe fn apxm_pass_registry_get_pass(_idx: usize) -> *const ApxmPassInfo { std::ptr::null() }
+    pub unsafe fn apxm_pass_registry_find_pass(_name: *const c_char) -> *const ApxmPassInfo { std::ptr::null() }
+
+    // ── Codegen ────────────────────────────────────────────────────────────
+    /// Emit artifact bytes. Returns allocated buffer (caller frees with apxm_codegen_free), or null.
+    pub unsafe fn apxm_codegen_emit_artifact(
+        _m: *mut ApxmModule, _opts: *const ApxmArtifactOptions,
+    ) -> *mut c_char { std::ptr::null_mut() }
+    pub unsafe fn apxm_codegen_free(_buf: *mut c_char) {}
+
+    // ── String / error ─────────────────────────────────────────────────────
+    pub unsafe fn apxm_string_free(_s: *mut c_char) {}
+    pub unsafe fn apxm_error_collector_count() -> usize { 0 }
+    pub unsafe fn apxm_error_collector_get_all(
+        _out: *mut *mut ApxmError, _cap: usize,
+    ) -> usize { 0 }
+    pub unsafe fn apxm_error_collector_get_first() -> *const ApxmError { std::ptr::null() }
+    pub unsafe fn apxm_error_free(_err: *mut ApxmError) {}
+}
+pub use bindings_inner::*;
+"#;
+    let bindings_path = out_dir.join("bindings.rs");
+    std::fs::write(&bindings_path, stub).context("Failed to write stub bindings")?;
+    log_info!(
+        "apxm-compiler-build",
+        "MLIR not found — wrote stub bindings. Compiler will return errors at runtime."
+    );
+    Ok(())
+}
+
 /// Main build process orchestrator
 fn build() -> Result<()> {
     let config = BuildConfig::from_env()?;
@@ -414,18 +549,42 @@ fn build() -> Result<()> {
     );
     generate_pass_files(&config.out_dir, Some(&config.build_dir))?;
 
-    // ═══ STEP 2: Locate MLIR installation ═══
-    let MlirLayout {
-        prefix: mlir_dir,
-        lib_dir: mlir_lib_dir,
-        link_spec: _,
-    } = locate_mlir_layout()?;
+    // ═══ STEP 2: Locate MLIR installation (optional) ═══
+    let mlir_layout = match locate_mlir_layout() {
+        Ok(layout) => {
+            log_info!(
+                "apxm-compiler-build",
+                "Found MLIR at: {}",
+                layout.prefix.display()
+            );
+            Some(layout)
+        }
+        Err(e) => {
+            log_info!(
+                "apxm-compiler-build",
+                "MLIR not found ({}). Building without native compiler support.",
+                e
+            );
+            None
+        }
+    };
 
-    log_info!(
-        "apxm-compiler-build",
-        "Found MLIR at: {}",
-        mlir_dir.display()
-    );
+    let Some(mlir_layout) = mlir_layout else {
+        // No MLIR: emit stub bindings and exit successfully.
+        // The Rust wrapper will return errors at runtime when compile_graph() is called.
+        // MLIR-dependent tests will be skipped (no `mlir` feature emitted).
+        generate_stub_bindings(&config.out_dir)?;
+        return Ok(());
+    };
+
+    // MLIR found — emit the feature flag so MLIR-dependent tests are enabled.
+    println!("cargo:rustc-cfg=feature=\"mlir\"");
+
+    let MlirLayout {
+        prefix: ref mlir_dir,
+        lib_dir: ref mlir_lib_dir,
+        ..
+    } = mlir_layout;
 
     let apxm_lib_dir = config.install_dir.join("lib");
     let mut runtime_rpaths = vec![apxm_lib_dir, mlir_lib_dir.clone()];
@@ -444,7 +603,7 @@ fn build() -> Result<()> {
         configure_cmake(
             &config.build_dir,
             &config.manifest_dir,
-            &mlir_dir,
+            mlir_dir,
             &config.install_dir,
             &runtime_rpaths,
             &config.workspace_dir,
@@ -476,7 +635,7 @@ fn build() -> Result<()> {
         &config.out_dir,
         &mlir_include_dir,
         &project_include_dir,
-        &mlir_dir,
+        mlir_dir,
     )?;
 
     emit_compiler_link_directives(&config.install_dir, &locate_mlir_layout()?)?;

@@ -27,6 +27,11 @@ thiserror = "2.0.17"
 insta = { version = "1.44.3", features = ["yaml"] }
 tempfile = "3.23.0"
 
+[features]
+# Enable tests that require a real MLIR/LLVM installation.
+# Without this feature, MLIR-dependent tests are automatically skipped.
+mlir = []
+
 [build-dependencies]
 anyhow = "1.0.100"
 apxm-core = { version = "0.0.1", path = "../runtime/apxm-core" }
