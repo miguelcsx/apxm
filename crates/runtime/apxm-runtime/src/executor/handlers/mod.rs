@@ -1,12 +1,14 @@
 //! Operation handlers for all AIS operation types
 
 pub mod branch;
+pub mod claim;
 pub mod communicate;
 pub mod const_str;
 pub mod err;
 pub mod exc;
 pub mod fence;
 pub mod flow_call;
+pub mod guard;
 pub mod inner_plan;
 pub mod inv;
 pub mod jump;
@@ -14,14 +16,17 @@ pub mod llm; // Unified handler for Ask/Think/Reason operations
 pub mod loop_end;
 pub mod loop_start;
 pub mod merge;
+pub mod pause;
 pub mod plan;
 pub mod print;
 pub mod qmem;
 pub mod reflect;
+pub mod resume;      // Phase 1: RESUME
 pub mod return_op;
 pub mod switch;
 pub mod try_catch;
 pub mod umem;
+pub mod update_goal;
 pub mod verify;
 pub mod wait_all;
 

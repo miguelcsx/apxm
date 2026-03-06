@@ -89,6 +89,18 @@ pub enum AISOperationType {
     /// Communication between agents.
     Communicate,
 
+    // Coordination Operations (Phase 1 ISA Extensions)
+    /// Update agent goals at runtime (set/remove/clear).
+    UpdateGoal,
+    /// Enforce preconditions before execution continues.
+    Guard,
+    /// Atomically claim a task from a shared work queue.
+    Claim,
+    /// Suspend execution pending human-in-the-loop review.
+    Pause,
+    /// Resume a suspended execution from a PAUSE checkpoint.
+    Resume,
+
     // Internal Operations (not part of public AIS)
     /// String constant (compiler internal).
     ConstStr,
@@ -133,6 +145,12 @@ impl fmt::Display for AISOperationType {
             AISOperationType::Err => write!(f, "ERR"),
             // Communication
             AISOperationType::Communicate => write!(f, "COMMUNICATE"),
+            // Coordination (Phase 1 ISA Extensions)
+            AISOperationType::UpdateGoal => write!(f, "UPDATE_GOAL"),
+            AISOperationType::Guard => write!(f, "GUARD"),
+            AISOperationType::Claim => write!(f, "CLAIM"),
+            AISOperationType::Pause => write!(f, "PAUSE"),
+            AISOperationType::Resume => write!(f, "RESUME"),
             // Internal
             AISOperationType::ConstStr => write!(f, "CONST_STR"),
             AISOperationType::Yield => write!(f, "YIELD"),
@@ -169,6 +187,11 @@ impl AISOperationType {
             AISOperationType::TryCatch => "try_catch",
             AISOperationType::Err => "err",
             AISOperationType::Communicate => "communicate",
+            AISOperationType::UpdateGoal => "update_goal",
+            AISOperationType::Guard => "guard",
+            AISOperationType::Claim => "claim",
+            AISOperationType::Pause => "pause",
+            AISOperationType::Resume => "resume",
             AISOperationType::ConstStr => "const_str",
             AISOperationType::Yield => "yield",
         }
@@ -218,10 +241,16 @@ impl AISOperationType {
             AISOperationType::TryCatch,
             AISOperationType::Err,
             AISOperationType::Communicate,
+            // Phase 1 ISA extensions
+            AISOperationType::UpdateGoal,
+            AISOperationType::Guard,
+            AISOperationType::Claim,
+            AISOperationType::Pause,
+            AISOperationType::Resume,
         ]
     }
 
-    /// Get all operation types (25 total).
+    /// Get all operation types (31 total: 26 original + 5 phase-1 extensions).
     pub fn all_operations() -> &'static [AISOperationType] {
         &[
             AISOperationType::Agent,
@@ -248,6 +277,11 @@ impl AISOperationType {
             AISOperationType::TryCatch,
             AISOperationType::Err,
             AISOperationType::Communicate,
+            AISOperationType::UpdateGoal,
+            AISOperationType::Guard,
+            AISOperationType::Claim,
+            AISOperationType::Pause,
+            AISOperationType::Resume,
             AISOperationType::ConstStr,
             AISOperationType::Yield,
         ]
@@ -673,6 +707,82 @@ pub static AIS_OPERATIONS: &[OperationSpec] = &[
         min_inputs: 0,
         produces_output: true,
     },
+    // ========== Phase 1 ISA Extensions (4) ==========
+    OperationSpec {
+        op_type: AISOperationType::UpdateGoal,
+        name: "UpdateGoal",
+        category: OperationCategory::Memory,
+        description: "Modify AAM goals at runtime: set, remove, or clear",
+        fields: &[
+            OperationField::required("goal_id", "Goal identifier (used as description key for upsert/remove)"),
+            OperationField::optional("action", "Action to perform: set (default), remove, clear"),
+            OperationField::optional("priority", "Goal priority (u32, default: 1)"),
+        ],
+        needs_submission: false,
+        min_inputs: 0,
+        produces_output: true,
+    },
+    OperationSpec {
+        op_type: AISOperationType::Guard,
+        name: "Guard",
+        category: OperationCategory::ControlFlow,
+        description: "Enforce preconditions: halt or skip based on condition",
+        fields: &[
+            OperationField::required("condition", "Condition expression: '> 0.8', '!= null', 'not_empty', etc."),
+            OperationField::optional("error_message", "Message on failure"),
+            OperationField::optional("on_fail", "Failure mode: halt (default) or skip"),
+        ],
+        needs_submission: false,
+        min_inputs: 1,
+        produces_output: true,
+    },
+    OperationSpec {
+        op_type: AISOperationType::Claim,
+        name: "Claim",
+        category: OperationCategory::Communication,
+        description: "Atomically claim a task from a shared work queue via APXM server",
+        fields: &[
+            OperationField::required("queue", "Queue name to claim from"),
+            OperationField::optional("lease_ms", "Lease duration in ms (default: 60000)"),
+            OperationField::optional("max_wait_ms", "Max time to wait for a task (default: 5000)"),
+            OperationField::optional("server_url", "Override APXM_SERVER_URL env var"),
+        ],
+        needs_submission: true,
+        min_inputs: 0,
+        produces_output: true,
+    },
+    OperationSpec {
+        op_type: AISOperationType::Pause,
+        name: "Pause",
+        category: OperationCategory::Communication,
+        description: "Suspend execution pending human-in-the-loop review via checkpoint",
+        fields: &[
+            OperationField::required("message", "Human-readable message explaining the pause"),
+            OperationField::optional("checkpoint_id", "Stable checkpoint ID (auto-generated if omitted)"),
+            OperationField::optional("timeout_ms", "Max wait in ms (0 = indefinite, default: 0)"),
+            OperationField::optional("poll_interval_ms", "Polling interval in ms (default: 2000)"),
+            OperationField::optional("notification_url", "Webhook URL to notify on pause creation"),
+            OperationField::optional("server_url", "Override APXM_SERVER_URL env var"),
+        ],
+        needs_submission: true,
+        min_inputs: 0,
+        produces_output: true,
+    },
+    OperationSpec {
+        op_type: AISOperationType::Resume,
+        name: "Resume",
+        category: OperationCategory::ControlFlow,
+        description: "Resume a suspended PAUSE checkpoint; polls server until human resumes; returns human_input",
+        fields: &[
+            OperationField::required("checkpoint", "Checkpoint ID to resume from"),
+            OperationField::optional("poll_max_attempts", "Max polling attempts (default 60 × 5s = 5 min)"),
+            OperationField::optional("poll_interval_ms", "Interval between polls in ms (default 5000)"),
+            OperationField::optional("server_url", "Override APXM_SERVER_URL env var"),
+        ],
+        needs_submission: true,
+        min_inputs: 0,
+        produces_output: true,
+    },
 ];
 
 // ============================================================================
@@ -791,8 +901,8 @@ mod tests {
         );
         assert_eq!(
             AIS_OPERATIONS.len(),
-            23,
-            "Expected 23 public AIS operations"
+            28,
+            "Expected 28 public AIS operations (23 original + 5 phase-1 extensions)"
         );
         assert_eq!(
             INTERNAL_OPERATIONS.len(),
@@ -801,8 +911,8 @@ mod tests {
         );
         assert_eq!(
             AISOperationType::all_operations().len(),
-            26,
-            "Expected 26 total operations"
+            31,
+            "Expected 31 total operations (26 original + 5 phase-1 extensions)"
         );
     }
 

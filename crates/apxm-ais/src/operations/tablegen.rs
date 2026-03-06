@@ -417,6 +417,11 @@ fn to_tablegen_name(op_type: AISOperationType) -> String {
         AISOperationType::TryCatch => "TryCatch",
         AISOperationType::Err => "Err",
         AISOperationType::Communicate => "Communicate",
+        AISOperationType::UpdateGoal => "UpdateGoal",
+        AISOperationType::Guard => "Guard",
+        AISOperationType::Claim => "Claim",
+        AISOperationType::Pause => "Pause",
+        AISOperationType::Resume => "Resume",
         AISOperationType::ConstStr => "ConstStr",
         AISOperationType::Yield => "Yield",
     };

@@ -519,6 +519,131 @@ pub static FLOW_CALL: OperationMetadata = OperationMetadata {
     needs_submission: true,
 };
 
+/// UpdateGoal operation metadata.
+pub static UPDATE_GOAL: OperationMetadata = OperationMetadata {
+    name: "update_goal",
+    fields: &[
+        OperationField {
+            name: "goal_id",
+            required: true,
+            description: "Goal identifier (used as description key for upsert/remove)",
+        },
+        OperationField {
+            name: "action",
+            required: false,
+            description: "Action to perform: set (default), remove, clear",
+        },
+        OperationField {
+            name: "priority",
+            required: false,
+            description: "Goal priority (u32, default: 1)",
+        },
+    ],
+    needs_submission: false,
+};
+
+/// Guard operation metadata.
+pub static GUARD: OperationMetadata = OperationMetadata {
+    name: "guard",
+    fields: &[
+        OperationField {
+            name: "condition",
+            required: true,
+            description: "Condition expression: '> 0.8', '!= null', 'not_empty', etc.",
+        },
+        OperationField {
+            name: "error_message",
+            required: false,
+            description: "Message on failure",
+        },
+        OperationField {
+            name: "on_fail",
+            required: false,
+            description: "Failure mode: halt (default) or skip",
+        },
+    ],
+    needs_submission: false,
+};
+
+/// Claim operation metadata.
+pub static CLAIM: OperationMetadata = OperationMetadata {
+    name: "claim",
+    fields: &[
+        OperationField {
+            name: "queue",
+            required: true,
+            description: "Queue name to claim from",
+        },
+        OperationField {
+            name: "lease_ms",
+            required: false,
+            description: "Lease duration in ms (default: 60000)",
+        },
+        OperationField {
+            name: "max_wait_ms",
+            required: false,
+            description: "Max time to wait for a task (default: 5000)",
+        },
+        OperationField {
+            name: "server_url",
+            required: false,
+            description: "Override APXM_SERVER_URL env var",
+        },
+    ],
+    needs_submission: true,
+};
+
+/// Pause operation metadata.
+pub static PAUSE: OperationMetadata = OperationMetadata {
+    name: "pause",
+    fields: &[
+        OperationField {
+            name: "message",
+            required: true,
+            description: "Human-readable message explaining the pause",
+        },
+        OperationField {
+            name: "checkpoint_id",
+            required: false,
+            description: "Stable checkpoint ID (auto-generated if omitted)",
+        },
+        OperationField {
+            name: "timeout_ms",
+            required: false,
+            description: "Max wait in ms (0 = indefinite, default: 0)",
+        },
+        OperationField {
+            name: "notification_url",
+            required: false,
+            description: "Webhook URL to notify on pause creation",
+        },
+    ],
+    needs_submission: true,
+};
+
+/// Resume operation metadata.
+pub static RESUME: OperationMetadata = OperationMetadata {
+    name: "resume",
+    fields: &[
+        OperationField {
+            name: "checkpoint",
+            required: true,
+            description: "Checkpoint ID to resume from",
+        },
+        OperationField {
+            name: "poll_max_attempts",
+            required: false,
+            description: "Max polling attempts (default 60 × 5s = 5 min)",
+        },
+        OperationField {
+            name: "poll_interval_ms",
+            required: false,
+            description: "Interval between polls in ms (default 5000)",
+        },
+    ],
+    needs_submission: true,
+};
+
 /// Get operation metadata by operation type.
 pub fn get_operation_metadata(op_type: AISOperationType) -> &'static OperationMetadata {
     match op_type {
@@ -547,6 +672,11 @@ pub fn get_operation_metadata(op_type: AISOperationType) -> &'static OperationMe
         AISOperationType::TryCatch => &TRY_CATCH,
         AISOperationType::Err => &ERR,
         AISOperationType::Communicate => &COMMUNICATE,
+        AISOperationType::UpdateGoal => &UPDATE_GOAL,
+        AISOperationType::Guard => &GUARD,
+        AISOperationType::Claim => &CLAIM,
+        AISOperationType::Pause => &PAUSE,
+        AISOperationType::Resume => &RESUME,
         AISOperationType::ConstStr => &CONST_STR,
         AISOperationType::Yield => &YIELD,
     }
