@@ -12,13 +12,20 @@ apxm-graph = { path = "../apxm-graph" }
 apxm-runtime = { path = "../runtime/apxm-runtime", features = ["metrics"] }
 
 anyhow = "1"
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
 async-trait = "0.1"
+dashmap = "6"
+uuid = { version = "1", features = ["v4"] }
 async-stream = "0.3"
 axum = { version = "0.7", features = ["json"] }
 futures = "0.3"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "signal"] }
-tower-http = { version = "0.6", features = ["cors", "trace"] }
+tower = { version = "0.4", features = ["util"] }
+tower-http = { version = "0.6", features = ["cors", "trace", "request-id", "set-header"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
+
+[dev-dependencies]
+http-body-util = "0.1"
