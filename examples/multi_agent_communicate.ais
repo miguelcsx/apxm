@@ -1,0 +1,76 @@
+// multi_agent_communicate.ais — Cross-agent COMMUNICATE demo
+//
+// Demonstrates:
+// 1. COMMUNICATE op sending messages between agents via HTTP
+// 2. Agent registry — agents register themselves with the server
+// 3. A2A-compatible message format
+// 4. Two-agent pipeline: Analyst → Summarizer
+//
+// Setup:
+//   # Terminal 1: Start primary server (AnalystAgent)
+//   APXM_SERVER_ADDR=127.0.0.1:18800 apxm-server
+//
+//   # Terminal 2: Start secondary server (SummarizerAgent)
+//   APXM_SERVER_ADDR=127.0.0.1:18801 apxm-server
+//
+//   # Register both agents with the primary server
+//   curl -X POST http://localhost:18800/v1/agents/register \
+//     -H "Content-Type: application/json" \
+//     -d '{"name":"SummarizerAgent","url":"http://localhost:18801","flows":["summarize"]}'
+//
+//   # Execute this file
+//   apxm execute examples/multi_agent_communicate.ais "MI300X technical brief"
+//
+// The COMMUNICATE op resolves "SummarizerAgent" → http://localhost:18801
+// via the agent registry, then POSTs the message to /v1/receive.
+
+agent AnalystAgent {
+    memory {
+        session: STM
+    }
+
+    // Research a topic and produce detailed findings
+    flow analyze(topic: str) -> str {
+        think(
+            prompt: "Conduct a thorough technical analysis of: " + topic + "\n\n"
+                    + "Cover: architecture, capabilities, use cases, limitations, "
+                    + "competitive positioning, and key technical specifications.",
+            budget_tokens: 1000,
+            backend: "apxm"
+        ) -> analysis
+
+        return analysis
+    }
+
+    @entry flow main(topic: str) -> str {
+        analyze(topic) -> analysis
+
+        // Send findings to SummarizerAgent via COMMUNICATE
+        // The runtime looks up "SummarizerAgent" in the agent registry
+        // and POSTs to that agent's /v1/receive endpoint
+        communicate(
+            recipient: "SummarizerAgent",
+            protocol: "http",
+            message: analysis
+        ) -> summary_ack
+
+        return "Analysis sent. SummarizerAgent responded: " + summary_ack
+    }
+}
+
+agent SummarizerAgent {
+    memory {
+        session: STM
+    }
+
+    // Receive an analysis and produce an executive summary
+    @entry flow summarize(content: str) -> str {
+        ask(
+            prompt: "Produce a 3-bullet executive summary of this technical analysis:\n\n"
+                    + content,
+            backend: "apxm"
+        ) -> summary
+
+        return summary
+    }
+}

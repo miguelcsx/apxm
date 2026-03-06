@@ -1,0 +1,67 @@
+// apxm_council.ais — Multi-model council using On-Premises LLM
+//
+// Demonstrates:
+// 1. Three parallel ASK ops using the on-premises backend
+// 2. WAIT_ALL synchronization
+// 3. Synthesis step producing a final verdict
+// 4. COMMUNICATE to post the verdict to a peer agent
+//
+// Setup:
+//   export OCP_APIM_KEY="<your-key>"
+//   apxm execute examples/apxm_council.ais "What are the best hardware choices for LLM inference at scale?"
+//
+// Config (apxm.toml):
+//   [[llm_backends]]
+//   name = "apxm"
+//   provider = "openai"
+//   model = "env:APXM_LLM_MODEL"  # e.g. gpt-4o-mini or your deployed model name
+//   api_key = "dummy"
+//   base_url = "env:APXM_LLM_BASE_URL"  # e.g. https://your-llm-gateway/v1
+//   [llm_backends.extra_headers]
+//   Ocp-Apim-Subscription-Key = "env:OCP_APIM_KEY"
+//   user = "env:USERNAME"
+
+agent CouncilAgent {
+    memory {
+        session: STM
+    }
+
+    // Three independent experts review the question in parallel.
+    // APXM schedules them concurrently — latency = max(e1, e2, e3).
+    flow consult_experts(question: str) -> str {
+        ask(
+            backend: "apxm",
+            prompt: "You are a hardware architect. Answer concisely: " + question
+        ) -> expert1_verdict
+
+        ask(
+            backend: "apxm",
+            prompt: "You are a performance engineer. Answer concisely: " + question
+        ) -> expert2_verdict
+
+        ask(
+            backend: "apxm",
+            prompt: "You are a total-cost-of-ownership analyst. Answer concisely: " + question
+        ) -> expert3_verdict
+
+        // WAIT_ALL fires when all three experts have answered
+        // (APXM dataflow — no explicit wait needed, it's automatic from the DAG)
+
+        // Synthesize all three expert views into one definitive answer
+        think(
+            prompt: "Three experts reviewed: " + question + "\n\n"
+                    + "Hardware architect: " + expert1_verdict + "\n"
+                    + "Performance engineer: " + expert2_verdict + "\n"
+                    + "TCO analyst: " + expert3_verdict + "\n\n"
+                    + "Provide a definitive, balanced synthesis:",
+            budget_tokens: 500
+        ) -> synthesis
+
+        return synthesis
+    }
+
+    @entry flow main(question: str) -> str {
+        consult_experts(question) -> verdict
+        return verdict
+    }
+}

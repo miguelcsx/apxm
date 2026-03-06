@@ -1,0 +1,92 @@
+// code_review_council.ais — Security + quality review council
+//
+// Demonstrates:
+// 1. Multi-specialist parallel code review (security, quality, performance)
+// 2. WAIT_ALL synchronization between independent reviewers
+// 3. Synthesis of findings into a structured report
+// 4. Conditional flow based on severity
+//
+// Usage:
+//   apxm execute examples/code_review_council.ais \
+//     "$(cat my_function.rs)"
+//
+// This is the "Winner 1" example from plan/05_llm_councils.md:
+// ~90% CVE coverage vs ~65% for any single model.
+
+agent SecurityReviewer {
+    flow review(code: str) -> str {
+        ask(
+            prompt: "You are a security expert specializing in Rust and C++. "
+                    + "Identify ALL security vulnerabilities, memory safety issues, "
+                    + "injection risks, and CVEs in this code. Be exhaustive:\n\n"
+                    + code,
+            backend: "apxm"
+        ) -> findings
+        return findings
+    }
+}
+
+agent QualityReviewer {
+    flow review(code: str) -> str {
+        ask(
+            prompt: "You are a code quality expert. Identify: naming issues, "
+                    + "missing error handling, untested paths, poor abstractions, "
+                    + "and maintainability problems in this code:\n\n"
+                    + code,
+            backend: "apxm"
+        ) -> findings
+        return findings
+    }
+}
+
+agent PerformanceReviewer {
+    flow review(code: str) -> str {
+        ask(
+            prompt: "You are a performance optimization expert. Identify: "
+                    + "unnecessary allocations, blocking operations, O(n²) loops, "
+                    + "missed parallelism opportunities in this code:\n\n"
+                    + code,
+            backend: "apxm"
+        ) -> findings
+        return findings
+    }
+}
+
+agent CodeReviewCouncil {
+    memory {
+        session: STM
+        ltm: LTM
+    }
+
+    @entry flow review(code: str) -> str {
+        // Three specialist reviews run in parallel (APXM dataflow scheduler)
+        SecurityReviewer.review(code) -> security_findings
+        QualityReviewer.review(code) -> quality_findings
+        PerformanceReviewer.review(code) -> perf_findings
+
+        // Synthesize all findings
+        ask(
+            prompt: "CODE REVIEW COUNCIL SYNTHESIS\n"
+                    + "================================\n\n"
+                    + "Code under review:\n" + code + "\n\n"
+                    + "Security Review:\n" + security_findings + "\n\n"
+                    + "Quality Review:\n" + quality_findings + "\n\n"
+                    + "Performance Review:\n" + perf_findings + "\n\n"
+                    + "Produce a structured final report with:\n"
+                    + "1. CRITICAL issues (must fix before merge)\n"
+                    + "2. WARNINGS (should fix)\n"
+                    + "3. SUGGESTIONS (consider fixing)\n"
+                    + "4. VERDICT: APPROVE / REQUEST_CHANGES / REJECT",
+            backend: "apxm"
+        ) -> final_report
+
+        // Store the review in long-term memory for audit trail
+        store_fact(
+            text: "Code review completed. Verdict: " + final_report,
+            tags: ["code_review", "audit"],
+            source: "CodeReviewCouncil"
+        )
+
+        return final_report
+    }
+}
